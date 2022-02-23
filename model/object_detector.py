@@ -21,6 +21,7 @@ import cv2
 import numpy as np
 from tflite_support import metadata
 
+
 # pylint: disable=g-import-not-at-top
 try:
     # Import TFLite interpreter from tflite_runtime package if it's available.
@@ -178,6 +179,10 @@ class ObjectDetector:
         self._is_quantized_input = input_detail["dtype"] == np.uint8
         self._interpreter = interpreter
         self._options = options
+        self.coords = {}
+
+    def getCoords(self):
+        return self.coords
 
     def detect(self, input_image: np.ndarray) -> List[Detection]:
         """Run detection on an input image.
@@ -268,13 +273,16 @@ class ObjectDetector:
                     bottom=int(y_max * image_height),
                     right=int(x_max * image_width),
                 )
+
                 class_id = int(classes[i])
                 category = Category(
                     score=scores[i],
                     label=self._label_list[class_id],  # 0 is reserved for background
                     index=class_id,
                 )
+
                 result = Detection(bounding_box=bounding_box, categories=[category])
+
                 results.append(result)
 
         # Sort detection results by score ascending
@@ -307,5 +315,44 @@ class ObjectDetector:
         if self._options.max_results > 0:
             result_count = min(len(filtered_results), self._options.max_results)
             filtered_results = filtered_results[:result_count]
+
+        # coords = filtered_results[0].bounding_box
+        # res = {
+        #     "left": coords.left,
+        #     "right": coords.right,
+        #     "top": coords.top,
+        #     "bottom": coords.bottom,
+        # }
+        # print(json.dumps(res))
+        # print(filtered_results)
+
+        for detection in filtered_results:
+            coords = detection.bounding_box
+            index = detection.categories[0].index
+            score = detection.categories[0].score
+            res = {
+                "index": index,
+                "score": score,
+                "left": coords.left,
+                "right": coords.right,
+                "top": coords.top,
+                "bottom": coords.bottom,
+            }
+            # center = 640 / 2
+            # if coords.left > center and coords.right < center:
+            #     print("right")
+            # print(json.dumps(res))
+            self.coords = res
+
+        # [
+        #     Detection(
+        #         bounding_box=Rect(left=7, top=152, right=632, bottom=472),
+        #         categories=[Category(label="person", score=0.828125, index=0)],
+        #     ),
+        #     Detection(
+        #         bounding_box=Rect(left=324, top=180, right=635, bottom=385),
+        #         categories=[Category(label="cell phone", score=0.70703125, index=76)],
+        #     ),
+        # ]
 
         return filtered_results

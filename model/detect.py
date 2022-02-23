@@ -13,13 +13,39 @@
 # limitations under the License.
 """Main script to run the object detection routine."""
 import argparse
+import json
 import sys
 import time
 
 import cv2
-from model.object_detector import ObjectDetector
-from model.object_detector import ObjectDetectorOptions
-from model.utils import visualize
+from object_detector import ObjectDetector
+from object_detector import ObjectDetectorOptions
+import utils
+import socketio
+
+sio = socketio.Client()
+
+
+@sio.event
+def connect():
+    print("Connected")
+
+
+@sio.event
+def connect_error():
+    print("Connection failed")
+
+
+@sio.event
+def disconnect():
+    print("Disconnect")
+
+
+# @sio.on("coords")
+# def on_getCoords(data):
+#     print(data)
+
+sio.connect("http://127.0.0.1:5000/")
 
 
 def run(
@@ -71,19 +97,22 @@ def run(
     while cap.isOpened():
         success, image = cap.read()
         if not success:
-            # sys.exit(
-            #     "ERROR: Unable to read from webcam. Please verify your webcam settings."
-            # )
-            break
+            sys.exit(
+                "ERROR: Unable to read from webcam. Please verify your webcam settings."
+            )
 
         counter += 1
         image = cv2.flip(image, 1)
 
         # Run object detection estimation using the model.
         detections = detector.detect(image)
+        coords = detector.getCoords()
+        serialized_coords = json.dumps(str(coords))
+
+        sio.emit("coords", serialized_coords)
 
         # Draw keypoints and edges on input image
-        image = visualize(image, detections)
+        image = utils.visualize(image, detections)
 
         # Calculate the FPS
         if counter % fps_avg_frame_count == 0:
@@ -105,66 +134,67 @@ def run(
         )
 
         # Stop the program if the ESC key is pressed.
-        # if cv2.waitKey(1) == 27:
-        #     break
-        # cv2.imshow("object_detector", image)
+        if cv2.waitKey(1) == 27:
+            sio.disconnect()
+            break
+        cv2.imshow("object_detector", image)
 
-    # cap.release()
-    # cv2.destroyAllWindows()
-
-
-# def main():
-#     parser = argparse.ArgumentParser(
-#         formatter_class=argparse.ArgumentDefaultsHelpFormatter
-#     )
-#     parser.add_argument(
-#         "--model",
-#         help="Path of the object detection model.",
-#         required=False,
-#         default="efficientdet_lite0.tflite",
-#     )
-#     parser.add_argument(
-#         "--cameraId", help="Id of camera.", required=False, type=int, default=0
-#     )
-#     parser.add_argument(
-#         "--frameWidth",
-#         help="Width of frame to capture from camera.",
-#         required=False,
-#         type=int,
-#         default=640,
-#     )
-#     parser.add_argument(
-#         "--frameHeight",
-#         help="Height of frame to capture from camera.",
-#         required=False,
-#         type=int,
-#         default=480,
-#     )
-#     parser.add_argument(
-#         "--numThreads",
-#         help="Number of CPU threads to run the model.",
-#         required=False,
-#         type=int,
-#         default=4,
-#     )
-#     parser.add_argument(
-#         "--enableEdgeTPU",
-#         help="Whether to run the model on EdgeTPU.",
-#         action="store_true",
-#         required=False,
-#         default=False,
-#     )
-#     args = parser.parse_args()
-
-#     run(
-#         args.model,
-#         int(args.cameraId),
-#         args.frameWidth,
-#         args.frameHeight,
-#         int(args.numThreads),
-#         bool(args.enableEdgeTPU),
-#     )
+    cap.release()
+    cv2.destroyAllWindows()
 
 
-# if __name__ == "__main__":
-#     main()
+def main():
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument(
+        "--model",
+        help="Path of the object detection model.",
+        required=False,
+        default="efficientdet_lite0.tflite",
+    )
+    parser.add_argument(
+        "--cameraId", help="Id of camera.", required=False, type=int, default=0
+    )
+    parser.add_argument(
+        "--frameWidth",
+        help="Width of frame to capture from camera.",
+        required=False,
+        type=int,
+        default=640,
+    )
+    parser.add_argument(
+        "--frameHeight",
+        help="Height of frame to capture from camera.",
+        required=False,
+        type=int,
+        default=480,
+    )
+    parser.add_argument(
+        "--numThreads",
+        help="Number of CPU threads to run the model.",
+        required=False,
+        type=int,
+        default=4,
+    )
+    parser.add_argument(
+        "--enableEdgeTPU",
+        help="Whether to run the model on EdgeTPU.",
+        action="store_true",
+        required=False,
+        default=False,
+    )
+    args = parser.parse_args()
+
+    run(
+        args.model,
+        int(args.cameraId),
+        args.frameWidth,
+        args.frameHeight,
+        int(args.numThreads),
+        bool(args.enableEdgeTPU),
+    )
+
+
+if __name__ == "__main__":
+    main()
