@@ -17,7 +17,7 @@ import json
 import sys
 import time
 
-import cv2
+import cv2, queue as Queue, threading, time
 from object_detector import ObjectDetector
 from object_detector import ObjectDetectorOptions
 import utils
@@ -70,6 +70,7 @@ def run(
     # Variables to calculate FPS
     counter, fps = 0, 0
     start_time = time.time()
+    q = Queue.Queue()
 
     # Start capturing video input from the camera
     cap = cv2.VideoCapture(camera_id)
@@ -100,6 +101,12 @@ def run(
             sys.exit(
                 "ERROR: Unable to read from webcam. Please verify your webcam settings."
             )
+        if not q.empty():
+            try:
+                q.get_nowait()
+            except Queue.Empty:
+                pass
+        q.put(image)
 
         counter += 1
         image = cv2.flip(image, 1)
@@ -186,14 +193,18 @@ def main():
     )
     args = parser.parse_args()
 
-    run(
-        args.model,
-        int(args.cameraId),
-        args.frameWidth,
-        args.frameHeight,
-        int(args.numThreads),
-        bool(args.enableEdgeTPU),
+    t = threading.Thread(
+        target=run(
+            args.model,
+            int(args.cameraId),
+            args.frameWidth,
+            args.frameHeight,
+            int(args.numThreads),
+            bool(args.enableEdgeTPU),
+        )
     )
+    t.daemon = True
+    t.start()
 
 
 if __name__ == "__main__":
