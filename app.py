@@ -15,7 +15,7 @@ def index():
 @socketio.on("coords")
 def getCoords(data):
     loaded_data = json.loads(data)
-    Response(loaded_data)
+    print(loaded_data)
 
 
 if __name__ == "__main__":
