@@ -21,31 +21,37 @@ import cv2, queue as Queue, threading, time
 from object_detector import ObjectDetector
 from object_detector import ObjectDetectorOptions
 import utils
-import socketio
 
-sio = socketio.Client()
+sys.path.append("/home/pi/hyaboat-flask")
 
+# from arduino.relay import RelayOff, RelayOn
+import arduino.relay as relay
 
-@sio.event
-def connect():
-    print("Connected")
+# import socketio
 
-
-@sio.event
-def connect_error():
-    print("Connection failed")
+# sio = socketio.Client()
 
 
-@sio.event
-def disconnect():
-    print("Disconnect")
+# @sio.event
+# def connect():
+#     print("Connected")
+
+
+# @sio.event
+# def connect_error():
+#     print("Connection failed")
+
+
+# @sio.event
+# def disconnect():
+#     print("Disconnect")
 
 
 # @sio.on("coords")
 # def on_getCoords(data):
 #     print(data)
 
-sio.connect("http://127.0.0.1:5000/")
+# sio.connect("http://127.0.0.1:5000/")
 
 
 def run(
@@ -89,7 +95,7 @@ def run(
     options = ObjectDetectorOptions(
         num_threads=num_threads,
         score_threshold=0.3,
-        max_results=3,
+        max_results=2,
         enable_edgetpu=enable_edgetpu,
     )
     detector = ObjectDetector(model_path=model, options=options)
@@ -115,8 +121,10 @@ def run(
         detections = detector.detect(image)
         coords = detector.getCoords()
         serialized_coords = json.dumps(str(coords))
+        print(serialized_coords)
+        relay.RelayOn()
 
-        sio.emit("coords", serialized_coords)
+        # sio.emit("coords", serialized_coords)
 
         # Draw keypoints and edges on input image
         image = utils.visualize(image, detections)
@@ -139,10 +147,11 @@ def run(
             text_color,
             font_thickness,
         )
-
+        
         # Stop the program if the ESC key is pressed.
         if cv2.waitKey(1) == 27:
-            sio.disconnect()
+            relay.RelayOff()
+            # sio.disconnect()
             break
         cv2.imshow("object_detector", image)
 
@@ -158,7 +167,7 @@ def main():
         "--model",
         help="Path of the object detection model.",
         required=False,
-        default="efficientdet_lite0.tflite",
+        default="water-hyacinth-model0.tflite",
     )
     parser.add_argument(
         "--cameraId", help="Id of camera.", required=False, type=int, default=0
@@ -193,18 +202,25 @@ def main():
     )
     args = parser.parse_args()
 
-    t = threading.Thread(
-        target=run(
-            args.model,
-            int(args.cameraId),
-            args.frameWidth,
-            args.frameHeight,
-            int(args.numThreads),
-            bool(args.enableEdgeTPU),
-        )
-    )
-    t.daemon = True
+    t = threading.Thread(target=run, args=(args.model,
+        int(args.cameraId),
+        args.frameWidth,
+        args.frameHeight,
+        int(args.numThreads),
+        bool(args.enableEdgeTPU),))
+
     t.start()
+
+    # run(
+    #     args.model,
+    #     int(args.cameraId),
+    #     args.frameWidth,
+    #     args.frameHeight,
+    #     int(args.numThreads),
+    #     bool(args.enableEdgeTPU),
+    # )
+
+    # run("water-hyacinth-model0.tflite", 0, 640, 480, 4, False)
 
 
 if __name__ == "__main__":
