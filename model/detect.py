@@ -18,14 +18,11 @@ import sys
 import time
 
 import cv2, queue as Queue, threading, time
-from object_detector import ObjectDetector
-from object_detector import ObjectDetectorOptions
-import utils
+from model.object_detector import ObjectDetector
+from model.object_detector import ObjectDetectorOptions
+import model.utils as utils
 
 sys.path.append("/home/pi/hyaboat-flask")
-
-# from arduino.relay import RelayOff, RelayOn
-import arduino.relay as relay
 
 # import socketio
 
@@ -61,6 +58,8 @@ def run(
     height: int,
     num_threads: int,
     enable_edgetpu: bool,
+    relay,
+    motor,
 ) -> None:
     """Continuously run inference on images acquired from the camera.
 
@@ -119,10 +118,8 @@ def run(
 
         # Run object detection estimation using the model.
         detections = detector.detect(image)
-        coords = detector.getCoords()
-        serialized_coords = json.dumps(str(coords))
-        print(serialized_coords)
-        relay.RelayOn()
+        # coords = detector.getCoords()
+
 
         # sio.emit("coords", serialized_coords)
 
@@ -148,18 +145,27 @@ def run(
             font_thickness,
         )
         
+        
         # Stop the program if the ESC key is pressed.
         if cv2.waitKey(1) == 27:
-            relay.RelayOff()
             # sio.disconnect()
+            try:
+                relay.turnOn()
+                motor.forward(0.5,0.5)
+            
+            except KeyboardInterrupt:
+                relay.turnOff()
+                motor.full_stop(0.5)
             break
-        cv2.imshow("object_detector", image)
+        # cv2.imshow("object_detector", image)
+        
+
 
     cap.release()
     cv2.destroyAllWindows()
 
 
-def main():
+def main(relay, motor):
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
@@ -167,7 +173,7 @@ def main():
         "--model",
         help="Path of the object detection model.",
         required=False,
-        default="water-hyacinth-model0.tflite",
+        default="model/water-hyacinth-model0.tflite",
     )
     parser.add_argument(
         "--cameraId", help="Id of camera.", required=False, type=int, default=0
@@ -207,7 +213,9 @@ def main():
         args.frameWidth,
         args.frameHeight,
         int(args.numThreads),
-        bool(args.enableEdgeTPU),))
+        bool(args.enableEdgeTPU),
+        relay,
+        motor,))
 
     t.start()
 
@@ -222,6 +230,3 @@ def main():
 
     # run("water-hyacinth-model0.tflite", 0, 640, 480, 4, False)
 
-
-if __name__ == "__main__":
-    main()

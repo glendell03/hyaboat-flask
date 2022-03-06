@@ -1,23 +1,18 @@
 import pyfirmata
+from time import sleep
 
+class Relay:
+     def __init__(self, board, pin):
+         self.pin = pin
+         self.board = board
 
-# class Relay:
-#     def __init__(self) -> None:
-#         self.pin = 13
-#         self.board = pyfirmata.Arduino("/dev/ttyACM0")
+         self.mod = self.board.get_pin(f'd:{self.pin}:o')
 
-#     def turnOn(self):
-#         self.board.digital[self.pin].write(1)
+     def turnOn(self):
+         self.mod.write(1)
+         sleep(0.15)
 
-#     def turnOff(self):
-#         self.board.digital[self.pin].write(0)
-
-pin = 13
-board = pyfirmata.Arduino("/dev/ttyACM0")
-
-def RelayOn():
-    board.digital[pin].write(1)
-
-def RelayOff():
-    board.digital[pin].write(0)
+     def turnOff(self):
+         self.mod.write(0)
+         sleep(0.15)
 
