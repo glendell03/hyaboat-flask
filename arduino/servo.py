@@ -9,4 +9,5 @@ class Servo():
     
     def angle(self, angle):
         self.servo.write(angle)
+        sleep(0.15)
 
